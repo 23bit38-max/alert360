@@ -1,0 +1,10 @@
+{
+  "active_version": "v1",
+  "models": {
+    "v1": {
+      "path": "v1/best.pt",
+      "description": "Baseline YOLO model for accident detection trained on traffic camera data",
+      "target_image_size": [640, 640]
+    }
+  }
+}

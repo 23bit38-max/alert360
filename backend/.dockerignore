@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+runs/
+training/
+tests/
+storage/uploads/
+storage/frames/
+storage/outputs/
+.env
+tree.txt
+*.log
+.pytest_cache/

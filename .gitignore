@@ -1,0 +1,15 @@
+# Large ML related files
+backend/**/*.dll
+backend/**/*.lib
+backend/**/*.exe
+backend/**/*.bin
+backend/**/*.pt
+backend/**/*.pth
+backend/**/*.onnx
+backend/**/*.weights
+backend/**/*.h5
+
+# Local environment
+backend/.venv/
+backend/__pycache__/
+backend/.env
