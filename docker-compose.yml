@@ -3,12 +3,12 @@ version: '3.8'
 services:
   backend:
     build:
-      context: ./model
+      context: ./backend
     ports:
       - "8000:8000"
     volumes:
-      - ./model/storage:/app/storage
-      - ./model/models:/app/models
+      - ./backend/storage:/app/storage
+      - ./backend/models:/app/models
     environment:
       # Optional: any env files or vars
       - PYTHONDONTWRITEBYTECODE=1
