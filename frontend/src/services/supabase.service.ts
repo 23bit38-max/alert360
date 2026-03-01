@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/core/config/supabase.config';
 
 /**
  * Uploads a file (File or Blob) to Supabase Storage.

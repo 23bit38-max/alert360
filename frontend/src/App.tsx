@@ -1,26 +1,27 @@
-import * as React from 'react';
-import { AuthProvider, useAuth } from './components/auth/AuthContext';
-import { NotificationProvider } from './components/shared/NotificationService';
-import { AuthPage } from './components/auth/AuthPage';
-import { DashboardLayout } from './components/layout/DashboardLayout';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from '@/core/auth/AuthContext';
+import { NotificationProvider } from '@/shared/components/NotificationService';
+import { AuthPage } from '@/core/auth/AuthPage';
+import { DashboardLayout } from '@/core/layout/DashboardLayout';
 
-import { Dashboard } from './components/pages/Dashboard';
-import { LiveCameras } from './components/pages/LiveCameras';
-import { RealTimeAlerts } from './components/pages/RealTimeAlerts';
-import { MapView } from './components/pages/MapView';
-import { IncidentHistory } from './components/pages/IncidentHistory';
-import { Approvals } from './components/pages/Approvals';
-import { NotificationControl } from './components/pages/NotificationControl';
-import { ReportsAnalytics } from './components/pages/ReportsAnalytics';
-import { UserManagement } from './components/pages/UserManagement';
-import { SystemSettings } from './components/pages/SystemSettings';
-import { Profile } from './components/pages/Profile';
-import { ManualUpload } from './components/pages/ManualUpload/ManualUpload';
-import { ProtectedPage } from './components/common/ProtectedPage'; // ✅ added
-import { ThemeProvider } from './theme';
+import { Dashboard } from '@/features/dashboard/Dashboard';
+import { LiveCameras } from '@/features/live-cameras';
+import { RealTimeAlerts } from '@/features/alerts/real-time-alerts/RealTimeAlerts';
+import { MapView } from '@/features/alerts/map-view/MapView';
+import { IncidentHistory } from '@/features/incidents/incident-history';
+import { Approvals } from '@/features/settings/approvals/Approvals';
+import { NotificationControl } from '@/features/notifications/NotificationControl';
+import { ReportsAnalytics } from '@/features/reports';
+import { UserManagement } from '@/features/users/user-management';
+import { SystemSettings } from '@/features/settings/system-settings/SystemSettings';
+import { ManualUpload } from '@/features/manual-upload/ManualUpload';
+import { ProtectedPage } from '@/core/auth/ProtectedPage';
+import { ThemeProvider } from '@/core/theme';
 
-import { Toaster } from './components/ui/sonner';
-import { StickyNotifications } from './components/shared/StickyNotifications';
+import { Toaster } from '@/shared/components/ui/sonner';
+import { StickyNotifications } from '@/shared/components/StickyNotifications';
+import { ProfileDashboard as Profile } from '@/features/users/profile/ProfileDashboard';
+import { ProfileSetup } from '@/core/auth/ProfileSetup';
 
 type PageType =
   | 'dashboard'
@@ -34,7 +35,7 @@ type PageType =
   | 'users'
   | 'settings'
   | 'profile'
-  | 'upload'; // ✅ added manual upload page
+  | 'upload';
 
 const LoadingScreen = () => (
   <div className="min-h-screen bg-background dark flex items-center justify-center p-4">
@@ -62,9 +63,9 @@ const LoadingScreen = () => (
 );
 
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
-  const [hasError, setHasError] = React.useState(false);
+  const [hasError, setHasError] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleError = () => setHasError(true);
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
@@ -113,9 +114,9 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
 
 const AppContent = () => {
   const { user, loading } = useAuth();
-  const [currentPage, setCurrentPage] = React.useState<PageType>('dashboard');
-  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-  const [isMobile, setIsMobile] = React.useState(false);
+  const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Handle online/offline status
   React.useEffect(() => {
@@ -131,13 +132,6 @@ const AppContent = () => {
     };
   }, []);
 
-  // Check if mobile
-  React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Prevent zoom on mobile devices
   React.useEffect(() => {
@@ -167,12 +161,67 @@ const AppContent = () => {
     };
   }, []);
 
+  // PWA Install Prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      const installPrompt = document.getElementById('pwa-install-prompt');
+      if (installPrompt) {
+        installPrompt.classList.remove('hidden');
+      }
+    };
+
+    const handleAppInstalled = () => {
+      const installPrompt = document.getElementById('pwa-install-prompt');
+      if (installPrompt) {
+        installPrompt.classList.add('hidden');
+      }
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to the install prompt: ${outcome}`);
+      if (outcome === 'accepted') {
+        const installPrompt = document.getElementById('pwa-install-prompt');
+        if (installPrompt) {
+          installPrompt.classList.add('hidden');
+        }
+      }
+      setDeferredPrompt(null);
+    }
+  };
+
+  const handleDismissInstallPrompt = () => {
+    const installPrompt = document.getElementById('pwa-install-prompt');
+    if (installPrompt) {
+      installPrompt.classList.add('hidden');
+    }
+    setDeferredPrompt(null);
+  };
+
   if (loading) {
     return <LoadingScreen />;
   }
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (user.profileCompleted === false) {
+    return <ProfileSetup />;
   }
 
   const renderPage = () => {
@@ -192,7 +241,7 @@ const AppContent = () => {
       case 'alerts':
         return (
           <ProtectedPage page="alerts">
-            <RealTimeAlerts />
+            <RealTimeAlerts setCurrentPage={setCurrentPage} />
           </ProtectedPage>
         );
       case 'map':
@@ -238,9 +287,6 @@ const AppContent = () => {
           </ProtectedPage>
         );
       case 'profile':
-        // Profile is usually accessible to all authenticated users, 
-        // but checking 'profile' page key if exists, or skipping wrapper if open to all.
-        // PAGE_ACCESS didn't have 'profile'. Everyone has a profile.
         return <Profile />;
       case 'upload':
         return (
@@ -285,8 +331,8 @@ const AppContent = () => {
         <ErrorBoundary>{renderPage()}</ErrorBoundary>
       </DashboardLayout>
 
-      {/* Mobile Sticky Notifications */}
-      {isMobile && <StickyNotifications />}
+      {/* Sticky Notifications */}
+      <StickyNotifications />
 
       {/* Toast Notifications */}
       <Toaster
@@ -332,10 +378,16 @@ const AppContent = () => {
               Install this app for quick access and offline capabilities.
             </p>
             <div className="flex space-x-2 mt-3">
-              <button className="text-xs bg-electric-blue text-black px-3 py-1.5 rounded-lg hover:bg-electric-blue/80 transition-colors">
+              <button
+                onClick={handleInstallClick}
+                className="text-xs bg-electric-blue text-black px-3 py-1.5 rounded-lg hover:bg-electric-blue/80 transition-colors"
+              >
                 Install
               </button>
-              <button className="text-xs text-gray-400 hover:text-white transition-colors">
+              <button
+                onClick={handleDismissInstallPrompt}
+                className="text-xs text-gray-400 hover:text-white transition-colors"
+              >
                 Not now
               </button>
             </div>

@@ -11,8 +11,8 @@
  * - Real applications would connect to an actual database instead of using this mock data
  */
 
-import type { UserRole, Permission } from '../utils/rbac';
-import { DEFAULT_PERMISSION_TEMPLATES } from '../utils/rbac';
+import type { UserRole, Permission } from '@/shared/utils/rbac';
+import { DEFAULT_PERMISSION_TEMPLATES } from '@/shared/utils/rbac';
 
 // ===== USER TYPE =====
 export interface User {
@@ -25,7 +25,8 @@ export interface User {
   department: string;
   assignedZones: string[];
   permissionToggles?: Record<string, boolean>;
-  status: 'active' | 'suspended' | 'pending';
+  status: 'active' | 'suspended' | 'pending' | 'approved';
+  profileCompleted?: boolean;
   createdAt: Date;
   lastModified: Date;
   modifiedBy?: string;
@@ -40,11 +41,13 @@ export interface User {
 }
 
 // Helper to convert permission array to toggles
-const permissionsToToggles = (permissions: readonly Permission[]): Record<string, boolean> => {
+const permissionsToToggles = (permissions: readonly Permission[] | undefined): Record<string, boolean> => {
   const toggles: Record<string, boolean> = {};
-  permissions.forEach(permission => {
-    toggles[permission] = true;
-  });
+  if (permissions) {
+    permissions.forEach(permission => {
+      toggles[permission] = true;
+    });
+  }
   return toggles;
 };
 
@@ -229,6 +232,24 @@ export const MOCK_USERS: Record<string, User> = {
     lastModified: new Date('2025-02-17'),
     zones: [],
     permissions: []
+  },
+
+  // Newly Approved User - Needs Profile Setup
+  new_approved_user: {
+    id: 'user-002',
+    email: 'new.operator@agency.gov',
+    password: 'demo123',
+    name: 'Jane Doe',
+    role: 'monitoring_operator',
+    avatar: '',
+    department: 'system',
+    assignedZones: [],
+    status: 'approved',
+    profileCompleted: false,
+    createdAt: new Date(),
+    lastModified: new Date(),
+    zones: [],
+    permissions: []
   }
 };
 
@@ -261,7 +282,7 @@ export const REALTIME_ALERTS = [
     id: 'alert-001',
     type: 'critical' as const,
     title: 'Multi-Vehicle Collision',
-    location: 'Anna Salai & Nungambakkam Junction, Mumbai',
+    location: 'Mumbai Central Junction',
     zone: 'central-Mumbai',
     timestamp: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
     vehicles: 3,
