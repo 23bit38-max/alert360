@@ -49,6 +49,22 @@ app.add_middleware(
 model = None
 accident_class_ids = []
 
+@app.get("/health")
+@app.get("/")
+async def health_check():
+    """
+    Professional health check endpoint for monitoring.
+    Maps both /health and / to avoid 404s on Render's root pings.
+    """
+    return {
+        "status": "online",
+        "service": "Alert360-Backend",
+        "model_loaded": model is not None,
+        "classes_count": len(accident_class_ids),
+        "environment": os.getenv("NODE_ENV", "production") 
+    }
+
+
 @app.on_event("startup")
 def startup_event():
     global model, accident_class_ids
