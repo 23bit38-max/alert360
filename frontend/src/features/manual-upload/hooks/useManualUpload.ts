@@ -306,21 +306,24 @@ export const useManualUpload = () => {
             };
 
             const syncToastId = toast.loading('Establishing Operational Log...');
-            const { saveAccidentToSupabase } = await import('@/services/supabase.service');
+            const { saveAccidentToFirestore, updateAccidentDoc } = await import('@/services/firebase.service');
 
-            // Pass all files except if we only have one video (which we don't store)
-            const manualFiles = uploadedFiles
-                .map(f => f.file)
-                .filter(f => !f.type.startsWith('video'));
-
-            await saveAccidentToSupabase(incidentData, manualFiles, accidentId);
-            toast.success('Log Established', { id: syncToastId });
+            try {
+                await saveAccidentToFirestore(incidentData, accidentId);
+                toast.success('Log Established', { id: syncToastId });
+            } catch (dbError) {
+                console.warn("Could not save to Firebase, continuing in local mode:", dbError);
+                toast.success('Local Analysis Mode Enabled', { id: syncToastId });
+            }
 
             // 3. START ANALYSIS
             const result = await analyzeIncident(
                 mainFile,
                 cameraId,
                 location,
+                latitude,
+                longitude,
+                location, // Use location as address for now
                 accidentId,
                 enableEmail,
                 enableSms,
@@ -337,35 +340,32 @@ export const useManualUpload = () => {
             updateStats(result);
 
             // 4. Update Accident and AI Analysis Record with final results
-            const { supabase } = await import('@/core/config/supabase.config');
-            if (result.accidentDetected) {
-                // Update parent accident record with AI results
-                await supabase.from('accidents').update({
-                    incident_category: result.label || incidentCategory || 'Accident',
-                    operational_priority: 'High',
-                    response_status: 'Responding'
-                }).eq('id', accidentId);
+            try {
+                if (result.accidentDetected) {
+                    // Update parent accident record with AI results
+                    await updateAccidentDoc(accidentId, {
+                        category: result.label || incidentCategory || 'Accident',
+                        priority: 'High',
+                        status: 'Responding'
+                    });
 
-                // Update vehicle involvement if we have counts
-                if (result.boxes) {
-                    await supabase.from('vehicle_involvement').update({
-                        vehicle_count: result.boxes.length
-                    }).eq('accident_id', accidentId);
+                    // Update vehicle involvement if we have counts
+                    if (result.boxes) {
+                        await updateAccidentDoc(accidentId, {
+                            vehicleInvolvement: {
+                                ...incidentData.vehicles,
+                                count: result.boxes.length
+                            }
+                        });
+                    }
+                } else {
+                    // Update parent to resolved/no-accident if nothing found
+                    await updateAccidentDoc(accidentId, {
+                        status: 'Resolved'
+                    });
                 }
-
-                // Insert AI analysis detail
-                await supabase.from('ai_analysis').insert({
-                    accident_id: accidentId,
-                    accident_detected: true,
-                    confidence_score: result.bestConfidence,
-                    engine_version: 'YOLOv8-PROD-GOV',
-                    detection_labels: result.label ? [result.label] : []
-                });
-            } else {
-                // Update parent to resolved/no-accident if nothing found
-                await supabase.from('accidents').update({
-                    response_status: 'Resolved'
-                }).eq('id', accidentId);
+            } catch (dbError) {
+                console.warn("Could not update Firebase with results:", dbError);
             }
 
             if (mainFile.type.startsWith('video')) {

@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
-import { supabase } from '@/core/config/supabase.config';
+import { fetchAccidents } from '@/services/firebase.service';
+import { db } from '@/core/config/firebase.config';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { AppColors } from '@/core/theme/app.colors';
 import {
   Bell,
@@ -47,14 +49,14 @@ export const StickyNotifications = () => {
     return {
       id: accident.id,
       type: 'alert',
-      priority: (accident.operational_priority || 'medium').toLowerCase() as any,
-      title: `${accident.incident_category || 'New Incident'} Detected`,
-      message: `${accident.incident_category} reported at ${accident.address || accident.location || 'site'}. Source: ${accident.source_type || 'AI Sensor'}.`,
+      priority: (accident.priority || 'medium').toLowerCase() as any,
+      title: `${accident.category || 'New Incident'} Detected`,
+      message: `${accident.category} reported at ${accident.address || accident.location || 'site'}. Source: ${accident.source_type || 'AI Sensor'}.`,
       location: accident.address || accident.location || 'Mumbai Core',
       department: (accident.department || 'multi').toLowerCase().includes('fire') ? 'fire' :
         (accident.department || 'multi').toLowerCase().includes('police') ? 'police' :
           (accident.department || 'multi').toLowerCase().includes('medical') ? 'hospital' : 'multi',
-      timestamp: new Date(accident.observed_at || accident.created_at),
+      timestamp: accident.observedAt instanceof Date ? accident.observedAt : new Date(accident.observedAt || accident.createdAt),
       read: false,
       dismissed: false
     };
@@ -62,16 +64,10 @@ export const StickyNotifications = () => {
 
   const fetchInitialNotifications = async () => {
     try {
-      const { data, error } = await supabase
-        .from('accidents')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
+      const data = await fetchAccidents();
 
       if (data) {
-        const mapped = data.map(mapAccidentToNotification);
+        const mapped = data.slice(0, 10).map(mapAccidentToNotification);
         const savedStates = JSON.parse(localStorage.getItem('alert360_notifications_state') || '{}');
         setNotifications(mapped.map(n => ({
           ...n,
@@ -87,30 +83,34 @@ export const StickyNotifications = () => {
   useEffect(() => {
     fetchInitialNotifications();
 
-    // Supabase Real-time Subscription
-    const channel = supabase
-      .channel('accidents-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'accidents' }, (payload) => {
-        console.log('New Accident!:', payload);
-        const newNotif = mapAccidentToNotification(payload.new);
+    // Firebase (Firestore) Real-time Subscription
+    const q = query(collection(db, 'accidents'), orderBy('createdAt', 'desc'), limit(1));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          // Skip the very first sync if it's already in the list
+          const newNotif = mapAccidentToNotification({ ...data, id: change.doc.id });
 
-        setNotifications(prev => {
-          const newNotifs = [newNotif, ...prev];
-          return newNotifs;
-        });
+          setNotifications(prev => {
+            if (prev.some(n => n.id === newNotif.id)) return prev;
+            const newNotifs = [newNotif, ...prev];
+            return newNotifs;
+          });
 
-        // Play subtle tactical alert sound for critical/high
-        if (newNotif.priority === 'critical' || newNotif.priority === 'high') {
-          playAlertSound();
-          setIsExpanded(true); // Auto-expand for critical notifications
+          if (newNotif.priority === 'critical' || newNotif.priority === 'high') {
+            playAlertSound();
+            setIsExpanded(true);
+          }
         }
-      })
-      .subscribe((status) => {
-        setIsConnected(status === 'SUBSCRIBED');
       });
+    }, (error) => {
+      console.error('Firestore subscription error:', error);
+      setIsConnected(false);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, []);
 

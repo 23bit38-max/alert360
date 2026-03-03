@@ -1,16 +1,18 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 import logging
 import uuid
+from datetime import datetime
 from ultralytics import YOLO
 from detection.accident_detector import detect_accident_classes
 from core.config import load_environment
 from core.settings import Settings
 from fastapi.responses import StreamingResponse
 from app.main import process_image, generate_frames
-
+from app.models.firestore_models import AccidentModel, UserModel, VehicleInvolvement, CasualtyReport
+from services.firestore_service import create_accident, update_accident, get_accidents, create_user
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +23,6 @@ load_environment()
 
 app = FastAPI()
 
-# Mount static directory for results
 # Mount static directory for results
 os.makedirs(os.path.join("storage", "outputs"), exist_ok=True)
 app.mount("/results", StaticFiles(directory=os.path.join("storage", "outputs")), name="results")
@@ -35,6 +36,7 @@ origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "http://127.0.0.1:5175",
+    "https://alert360.onrender.com",
 ]
 
 app.add_middleware(
@@ -52,10 +54,6 @@ accident_class_ids = []
 @app.get("/health")
 @app.get("/")
 async def health_check():
-    """
-    Professional health check endpoint for monitoring.
-    Maps both /health and / to avoid 404s on Render's root pings.
-    """
     return {
         "status": "online",
         "service": "Alert360-Backend",
@@ -86,9 +84,6 @@ analysis_jobs = {}
 
 @app.get("/api/video_feed")
 async def video_feed(filename: str):
-    """
-    Stream video with annotation and track status.
-    """
     file_path = os.path.join("storage", "uploads", filename)
     if not os.path.exists(file_path):
         return {"error": "File not found"}
@@ -116,138 +111,109 @@ async def get_analysis_status(filename: str):
         return {"status": "not_found"}
     return job
 
-@app.get("/api/diagnostic/model")
-async def model_diagnostic():
-    """Returns model class info for debugging."""
-    if not model:
-        return {"error": "Model not loaded"}
-    
-    return {
-        "all_classes": model.names,
-        "detected_accident_ids": accident_class_ids,
-        "detected_accident_names": [model.names[i] for i in accident_class_ids]
-    }
-
-@app.get("/api/diagnostic/env")
-async def env_diagnostic():
-    """Checks environment state."""
-    import sys
-    import subprocess
-    try:
-        pip_list = subprocess.check_output([sys.executable, "-m", "pip", "list"]).decode()
-    except:
-        pip_list = "Could not run pip"
-    
-    return {
-        "python_version": sys.version,
-        "executable": sys.executable,
-        "cwd": os.getcwd(),
-        "env_vars": {k: "SET" for k in os.environ},
-        "twilio_installed": "twilio" in pip_list.lower()
-    }
-
-@app.post("/api/diagnostic/trigger_alert")
-async def trigger_manual_alert(accident_id: str = Form(...), enable_sms: bool = Form(True)):
-    """Manually triggers a dispatch for testing purposes from inside the server process."""
-    from services.notification_service import dispatch_immediate_alerts
-    import threading
-    
-    thread = threading.Thread(
-        target=dispatch_immediate_alerts,
-        args=(accident_id, "MANUAL_TEST", 0.99, "https://example.com/manual_test.jpg", enable_sms, False),
-        daemon=True
-    )
-    thread.start()
-    return {"status": "Dispatch thread started", "accident_id": accident_id}
+@app.get("/api/accidents")
+async def fetch_all_accidents():
+    """Fetch all accidents from Firestore."""
+    return get_accidents()
 
 @app.post("/api/analyze")
 async def analyze_incident(
+    request: Request,
     file: UploadFile = File(...),
     camera_id: str = Form("Manual_Upload"),
-    location: str = Form(None),
+    location: str = Form("Detection Zone I"),
+    address: str = Form("Mumbai Highway, Mumbai"),
+    latitude: float = Form(19.0760),
+    longitude: float = Form(72.8777),
     accident_id: str = Form(None),
     enable_email: str = Form("true"),
     enable_sms: str = Form("true"),
     enable_call: str = Form("true")
 ):
     if not model:
-        return {"error": "Model not loaded service unavailable"}
+        raise HTTPException(status_code=503, detail="Model service unavailable")
 
-    # Generate or use provided accident_id
-    uid = accident_id or str(uuid.uuid4())
+    uid = accident_id or f"ACC-{uuid.uuid4().hex[:8].upper()}"
     alerts_email = enable_email.lower() == "true"
     alerts_sms = enable_sms.lower() == "true"
     alerts_call = enable_call.lower() == "true"
 
-    logger.info(f"📥 ANALYSIS REQUEST: ID={uid}, SMS_FLAG='{enable_sms}' -> {alerts_sms}, EMAIL_FLAG='{enable_email}' -> {alerts_email}")
-
     try:
-        # Save file to uploads directory (persist for streaming)
+        # Create Firestore Record First
+        new_accident = AccidentModel(
+            id=uid,
+            observedAt=datetime.utcnow(),
+            location=location or "Manual Analysis",
+            address=address or "Unknown Location",
+            latitude=latitude,
+            longitude=longitude,
+            zone="Central Mumbai",
+            city="Mumbai",
+            district="Mumbai City",
+            state="Maharashtra",
+            category="Pending Analysis",
+            severity="medium",
+            priority="Medium",
+            status="pending"
+        )
+        create_accident(new_accident)
+
+        # Save file to uploads directory
         upload_dir = os.path.join("storage", "uploads")
         os.makedirs(upload_dir, exist_ok=True)
         filename = f"{uid}_{file.filename}"
         file_path = os.path.join(upload_dir, filename)
         
-        # Save file (blocking write but async read to yield loop)
         with open(file_path, "wb") as buffer:
             while True:
-                content = await file.read(1024 * 1024)  # 1MB chunks
+                content = await file.read(1024 * 1024)
                 if not content:
                     break
                 buffer.write(content)
-            
-        logger.info(f"Received file: {filename}, saved to {file_path}")
 
-        # Determine type
         is_image = file.content_type.startswith("image/")
         
-        result = {}
         if is_image:
-            # Process image (visualize=False) - existing logic
             output_filename = f"processed_{filename}"
             output_path = os.path.join("storage", "outputs", output_filename)
 
             result = process_image(file_path, model, accident_class_ids, visualize=False, output_path=output_path, accident_id=uid, enable_email=alerts_email, enable_sms=alerts_sms, enable_call=alerts_call)
+            
+            # Update Document with Category discovered from image
+            update_accident(uid, {"category": result.get("label", "Collision")})
+            
             result["accident_id"] = uid
-            
-            if not isinstance(result, dict):
-                 result = {"accident_detected": False, "error": "Unknown processing error"}
-                 
+            return result
         else:
-            # Video: Return stream URL immediately
-            # Appending &live=true to force img tag in frontend
-            stream_url = f"http://localhost:8000/api/video_feed?filename={filename}&live=true"
-            
-            # Initialize status tracker immediately so polling gets 200 OK right away
+            base_url = str(request.base_url).rstrip('/')
+            stream_url = f"{base_url}/api/video_feed?filename={filename}&live=true"
             analysis_jobs[filename] = {
                 "status": "pending",
                 "accident_detected": False,
-                "label": "Waiting for stream...",
+                "label": "Initializing AI Engine...",
                 "confidence": 0.0,
-                "label": "Waiting for stream...",
-                "confidence": 0.0,
-                "snapshots": None,
                 "accident_id": uid,
+                "before_snapshot_url": None,
+                "after_snapshot_url": None,
                 "enable_email": alerts_email,
                 "enable_sms": alerts_sms,
                 "enable_call": alerts_call
             }
-            
-            result = {
+            return {
                 "accident_detected": False, 
                 "label": "Live Analysis",
-                "best_confidence": 0.0,
                 "image_url": stream_url,
                 "is_video": True,
                 "filename": filename,
-                "accident_id": uid,
-                "enable_email": alerts_email,
-                "enable_sms": alerts_sms,
-                "enable_call": alerts_call
+                "accident_id": uid
             }
-
-        return result
 
     except Exception as e:
         logger.error(f"Error processing upload: {e}")
         return {"error": str(e)}
+
+@app.post("/api/users/profile")
+async def update_user_profile(user: UserModel):
+    """Update or create user profile in Firestore."""
+    create_user(user)
+    return {"status": "success", "uid": user.uid}

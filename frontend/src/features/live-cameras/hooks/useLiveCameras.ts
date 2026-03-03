@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/core/auth/AuthContext';
 import type { CameraFeed } from '@/features/live-cameras/types';
-import { mockCameras } from '@/features/live-cameras/constants';
+import { fetchCameras } from '@/services/firebase.service';
 import {
     canAccessZone,
     getAccessibleZones,
@@ -21,10 +21,51 @@ export const useLiveCameras = () => {
     const [isMobile, setIsMobile] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedCamera, setSelectedCamera] = useState<CameraFeed | null>(null);
+    const [cameras, setCameras] = useState<CameraFeed[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // RBAC: Get accessible zones and permissions
     const accessibleZones = getAccessibleZones(user);
     const canRequestCamera = hasPermission(user, PERMISSIONS.CAMERA_REQUEST_INSTALL);
+
+    const loadCameras = async () => {
+        try {
+            setLoading(true);
+            const data = await fetchCameras();
+
+            if (data) {
+                const mapped: CameraFeed[] = data.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    location: c.location || 'N/A',
+                    zone: c.zone,
+                    status: c.status as any,
+                    lastDetection: 'N/A',
+                    confidence: 0,
+                    resolution: c.resolution,
+                    fps: c.fps,
+                    thumbnail: c.thumbnailUrl || 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=300&fit=crop',
+                    department: c.department,
+                    requestedBy: c.requestedBy,
+                    approvedBy: c.approvedBy,
+                    youtubeId: c.streamUrl
+                }));
+                setCameras(mapped);
+                if (!selectedCamera && mapped.length > 0) {
+                    setSelectedCamera(mapped[0]);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load cameras:', e);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        loadCameras();
+    }, []);
 
     useEffect(() => {
         const checkMobile = () => {
@@ -40,32 +81,25 @@ export const useLiveCameras = () => {
         return () => window.removeEventListener('resize', checkMobile);
     }, [gridSize]);
 
-    // Set default selected camera
-    useEffect(() => {
-        if (!selectedCamera && mockCameras.length > 0) {
-            setSelectedCamera(mockCameras[0]);
-        }
-    }, []);
-
     // RBAC: Filter cameras based on accessible zones
     const getFilteredCameras = () => {
-        let cameras = mockCameras;
+        let filtered = [...cameras];
 
         // Zone-based filtering
-        cameras = cameras.filter(camera =>
+        filtered = filtered.filter(camera =>
             accessibleZones.includes('all') || canAccessZone(user, camera.zone)
         );
 
         // Department filtering (if not Super Admin)
         if (!isSuperAdmin(user) && user?.department) {
-            cameras = cameras.filter(camera =>
+            filtered = filtered.filter(camera =>
                 camera.department === user.department
             );
         }
 
         // Search filtering
         if (searchQuery) {
-            cameras = cameras.filter(camera =>
+            filtered = filtered.filter(camera =>
                 camera.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 camera.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 camera.zone.toLowerCase().includes(searchQuery.toLowerCase())
@@ -74,22 +108,22 @@ export const useLiveCameras = () => {
 
         // Zone filtering
         if (selectedZone !== 'all') {
-            cameras = cameras.filter(camera => camera.zone === selectedZone);
+            filtered = filtered.filter(camera => camera.zone === selectedZone);
         }
 
         // Status filtering
         if (selectedStatus !== 'all') {
-            cameras = cameras.filter(camera => camera.status === selectedStatus);
+            filtered = filtered.filter(camera => camera.status === selectedStatus);
         }
 
-        return cameras;
+        return filtered;
     };
 
     const filteredCameras = getFilteredCameras();
 
     const handleRefresh = () => {
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 1000);
+        fetchCameras();
     };
 
     const getGridCols = () => {
@@ -118,6 +152,7 @@ export const useLiveCameras = () => {
         filteredCameras,
         handleRefresh,
         getGridCols,
-        user
+        user,
+        loading
     };
 };

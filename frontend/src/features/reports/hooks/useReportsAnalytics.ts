@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { fetchAccidents } from '@/services/supabase.service';
+import { fetchAccidents } from '@/services/firebase.service';
 
 export const useReportsAnalytics = () => {
     const [loading, setLoading] = useState(true);

@@ -1,10 +1,15 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch
-torchvision
-ultralytics
-opencv-python-headless
-supabase
+uvicorn
+python-multipart
 python-dotenv
+firebase-admin
+cloudinary
+twilio
+numpy
+opencv-python-headless
+ultralytics
+pydantic
+pydantic-settings
 fastapi
 uvicorn
 python-multipart

@@ -6,6 +6,12 @@ import type { DetectionResult } from '@/features/manual-upload/types/index';
  * Calls `onUpdate` whenever new data (confidence, detection status, or snapshots) is available.
  * Stops when status is 'done' or 'error', or after timeout.
  */
+const formatUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 /**
  * Polls /api/status/<filename> in the background to get real-time analysis updates.
  * Calls `onUpdate` whenever new data (confidence, detection status, or snapshots) is available.
@@ -42,8 +48,8 @@ function startStatusPolling(
                     bestConfidence: status.confidence ?? base.bestConfidence,
                     label: status.label ?? base.label,
                     boxes: status.boxes ?? base.boxes,
-                    beforeSnapshotUrl: status.before_snapshot_url ?? base.beforeSnapshotUrl,
-                    afterSnapshotUrl: status.after_snapshot_url ?? base.afterSnapshotUrl,
+                    beforeSnapshotUrl: formatUrl(status.before_snapshot_url) || base.beforeSnapshotUrl,
+                    afterSnapshotUrl: formatUrl(status.after_snapshot_url) || base.afterSnapshotUrl,
                 };
 
                 // Notify UI immediately (only if not aborted right after fetch)
@@ -81,6 +87,9 @@ export const analyzeIncident = async (
     file: File,
     cameraId: string,
     location: string,
+    latitude?: string,
+    longitude?: string,
+    address?: string,
     accidentId?: string,
     enableEmail: boolean = true,
     enableSms: boolean = true,
@@ -91,7 +100,11 @@ export const analyzeIncident = async (
     const formData = new FormData();
     formData.append('file', file);
     formData.append('camera_id', cameraId || 'Manual_Upload');
-    formData.append('location', location);
+    formData.append('location', location || 'Manual Analysis');
+    formData.append('address', address || location || 'Detection Zone I');
+    formData.append('latitude', String(latitude || 19.0760));
+    formData.append('longitude', String(longitude || 72.8777));
+
     if (accidentId) formData.append('accident_id', accidentId);
     formData.append('enable_email', String(enableEmail));
     formData.append('enable_sms', String(enableSms));
@@ -139,9 +152,9 @@ export const analyzeIncident = async (
         bestConfidence: data.best_confidence,
         label: data.label,
         boxes: (data as any).boxes,
-        imageUrl: data.image_url,
-        beforeSnapshotUrl: data.before_snapshot_url ?? null,
-        afterSnapshotUrl: data.after_snapshot_url ?? null,
+        imageUrl: formatUrl(data.image_url),
+        beforeSnapshotUrl: formatUrl(data.before_snapshot_url),
+        afterSnapshotUrl: formatUrl(data.after_snapshot_url),
     };
 
     // For videos: kick off polling immediately

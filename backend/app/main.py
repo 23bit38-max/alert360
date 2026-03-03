@@ -2,7 +2,8 @@ import cv2
 import os
 import logging
 from collections import deque
-from services.supabase_service import upload_image
+from services.cloudinary_service import upload_accident_image
+from services.firestore_service import update_accident
 
 logger = logging.getLogger(__name__)
 
@@ -119,27 +120,28 @@ def process_image(file_path, model, class_ids, visualize=False, output_path=None
         after_url = None
 
         if accident_detected and accident_id:
-            # 1. Upload RAW image as BEFORE
-            raw_remote_name = f"{accident_id}/before/before_accident.jpg"
-            before_url = upload_image(file_path, raw_remote_name)
+            # 1. Upload RAW image as BEFORE to Cloudinary
+            before_url = upload_accident_image(file_path, accident_id, "before")
             
-            # 2. Generate and Upload ANNOTATED image as AFTER
+            # 2. Generate and Upload ANNOTATED image as AFTER to Cloudinary
             if output_path:
                 annotated_frame = annotate_frame(img, results, model, class_ids)
                 cv2.imwrite(output_path, annotated_frame)
                 
-                after_remote_name = f"{accident_id}/after/after_accident.jpg"
-                after_url = upload_image(output_path, after_remote_name)
+                after_url = upload_accident_image(output_path, accident_id, "after")
                 
                 # Cleanup local annotated file
                 if after_url:
                     try: os.remove(output_path)
                     except: pass
             
-            # 3. Save both to database
+            # 3. Save both to Firestore
             if before_url or after_url:
-                from services.supabase_service import save_media_to_db
-                save_media_to_db(accident_id, before_url=before_url, after_url=after_url)
+                update_accident(accident_id, {
+                    "beforeImageUrl": before_url,
+                    "afterImageUrl": after_url,
+                    "status": "pending"
+                })
                 
                 # DISPATCH SYSTEM ALERTS
                 import threading
@@ -257,21 +259,16 @@ def generate_frames(video_path, model, class_ids, status_tracker=None, enable_em
                     # Oldest frame in buffer represents "before"
                     before_frame = frame_buffer[0] if len(frame_buffer) > 0 else annotated_frame
                         
-                    snap_name_before = "before_accident.jpg"
-                    # Path: accidents/{accident_id}/before/before_accident.jpg
-                    remote_path_before = f"{acc_id}/before/{snap_name_before}"
-                    
                     snap_path_before = os.path.join("storage", "outputs", f"{acc_id}_before.jpg")
                     cv2.imwrite(snap_path_before, before_frame)
                     
-                    # Upload and set URL
-                    sb_url = upload_image(snap_path_before, remote_path_before)
-                    status_tracker["before_snapshot_url"] = sb_url
+                    # Upload to Cloudinary
+                    cloudinary_url = upload_accident_image(snap_path_before, acc_id, "before")
+                    status_tracker["before_snapshot_url"] = cloudinary_url
                     
-                    # IMMEDIATELY SAVE TO DATABASE
-                    if sb_url and acc_id != "unknown":
-                        from services.supabase_service import save_media_to_db
-                        save_media_to_db(acc_id, before_url=sb_url)
+                    # IMMEDIATELY SAVE TO FIRESTORE
+                    if cloudinary_url and acc_id != "unknown":
+                        update_accident(acc_id, {"beforeImageUrl": cloudinary_url})
                         
                         # DISPATCH SYSTEM ALERTS IMMEDIATELY
                         if enable_sms or enable_call:
@@ -285,7 +282,7 @@ def generate_frames(video_path, model, class_ids, status_tracker=None, enable_em
                             ).start()
                     
                     # Cleanup local if uploaded
-                    if sb_url:
+                    if cloudinary_url:
                         try: os.remove(snap_path_before)
                         except: pass
                     
@@ -296,21 +293,16 @@ def generate_frames(video_path, model, class_ids, status_tracker=None, enable_em
                 if after_snapshot_frame_index and frame_count >= after_snapshot_frame_index:
                     if not status_tracker.get("after_snapshot_url"):
                         acc_id = status_tracker.get("accident_id", "unknown")
-                        snap_name_after = "after_accident.jpg"
-                        # Path: accidents/{accident_id}/after/after_accident.jpg
-                        remote_path_after = f"{acc_id}/after/{snap_name_after}"
-                        
                         snap_path_after = os.path.join("storage", "outputs", f"{acc_id}_after.jpg")
                         cv2.imwrite(snap_path_after, annotated_frame)
                         
-                        # Upload and set URL
-                        sb_url_after = upload_image(snap_path_after, remote_path_after)
-                        status_tracker["after_snapshot_url"] = sb_url_after
+                        # Upload to Cloudinary
+                        cloudinary_url_after = upload_accident_image(snap_path_after, acc_id, "after")
+                        status_tracker["after_snapshot_url"] = cloudinary_url_after
                         
-                        # IMMEDIATELY SAVE TO DATABASE
-                        if sb_url_after and acc_id != "unknown":
-                            from services.supabase_service import save_media_to_db
-                            save_media_to_db(acc_id, after_url=sb_url_after)
+                        # IMMEDIATELY SAVE TO FIRESTORE
+                        if cloudinary_url_after and acc_id != "unknown":
+                            update_accident(acc_id, {"afterImageUrl": cloudinary_url_after})
 
                             # DISPATCH HTML EMAIL
                             if enable_email:
@@ -318,16 +310,16 @@ def generate_frames(video_path, model, class_ids, status_tracker=None, enable_em
                                 from services.notification_service import dispatch_detailed_email
                                 threading.Thread(
                                     target=dispatch_detailed_email,
-                                    args=(acc_id, status_tracker.get("label", "Unknown"), status_tracker.get("confidence", 0.0), status_tracker.get("before_snapshot_url", "Unavailable"), sb_url_after),
+                                    args=(acc_id, status_tracker.get("label", "Unknown"), status_tracker.get("confidence", 0.0), status_tracker.get("before_snapshot_url", "Unavailable"), cloudinary_url_after),
                                     daemon=True
                                 ).start()
 
                         # Cleanup local if uploaded
-                        if sb_url_after:
+                        if cloudinary_url_after:
                             try: os.remove(snap_path_after)
                             except: pass
 
-            frame_buffer.append(annotated_frame)
+            frame_buffer.append(raw_frame)
 
             # Encode frame to JPEG
             ret, buffer = cv2.imencode('.jpg', annotated_frame)

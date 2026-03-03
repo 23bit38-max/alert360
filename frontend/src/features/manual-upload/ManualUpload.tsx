@@ -125,7 +125,7 @@ export const ManualUpload = () => {
         {!canUpload ? (
           <AccessRestricted userRole={user?.role} />
         ) : (
-          <div className="flex-1 flex flex-col gap-10 max-w-[1600px] mx-auto w-full min-h-0">
+          <div className="flex-1 flex flex-col gap-10 max-w-[1800px] mx-auto w-full min-h-0">
             <OperationalBar userName={user?.name} userRole={user?.role} />
 
             {canViewStats && (
@@ -134,79 +134,85 @@ export const ManualUpload = () => {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-10 pb-20">
-              {/* 1. Visual Feed Terminal (Top) */}
-              <div className="w-full animate-fade-in [animation-delay:200ms]">
-                <LeftPanel
-                  uploadedFiles={uploadedFiles}
-                  uploading={uploading}
-                  isDragging={isDragging}
-                  uploadProgress={uploadProgress}
-                  fileInputRef={fileInputRef}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onFileUpload={handleFileUpload}
-                  onOpenFilePicker={openFilePicker}
-                  onRemoveFile={removeFile}
-                  onClearAll={resetForm}
-                  detectionResult={detectionResult}
-                />
+            <div className="flex-1 flex flex-col lg:flex-row gap-10 min-h-0 overflow-hidden">
+              {/* 1. PRIMARY ANALYSIS COLUMN (Left) */}
+              <div className="lg:w-3/5 flex flex-col gap-8 overflow-y-auto custom-scrollbar pr-2 pb-10">
+                <div className="w-full animate-fade-in [animation-delay:200ms]">
+                  <LeftPanel
+                    uploadedFiles={uploadedFiles}
+                    uploading={uploading}
+                    isDragging={isDragging}
+                    uploadProgress={uploadProgress}
+                    fileInputRef={fileInputRef}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onFileUpload={handleFileUpload}
+                    onOpenFilePicker={openFilePicker}
+                    onRemoveFile={removeFile}
+                    onClearAll={resetForm}
+                    detectionResult={detectionResult}
+                  />
+                </div>
+
+                {/* 1.5 Forensic Evidence Log (Snapshots) */}
+                <div className="animate-fade-in [animation-delay:400ms]">
+                  <SnapshotsDisplay detectionResult={detectionResult} />
+                </div>
               </div>
 
-              {/* 1.5 Forensic Evidence Log (Snapshots) */}
-              <SnapshotsDisplay detectionResult={detectionResult} />
-
-              {/* 2. Operational Intel Center (Below) */}
-              <form onSubmit={handleSubmit} className="w-full animate-fade-in [animation-delay:400ms]">
-                <RightPanel
-                  disabled={uploading}
-                  incidentCategory={incidentCategory} setIncidentCategory={setIncidentCategory}
-                  priority={priority} setPriority={setPriority}
-                  location={location} setLocation={setLocation}
-                  zone={zone} setZone={setZone}
-                  city={city} setCity={setCity}
-                  district={district} setDistrict={setDistrict}
-                  stateName={stateName} setStateName={setStateName}
-                  roadHighwayId={roadHighwayId} setRoadHighwayId={setRoadHighwayId}
-                  latitude={latitude} setLatitude={setLatitude}
-                  longitude={longitude} setLongitude={setLongitude}
-                  incidentTime={incidentTime} setIncidentTime={setIncidentTime}
-                  uploadSource={uploadSource} setUploadSource={setUploadSource}
-                  vehiclesInvolved={vehiclesInvolved} setVehiclesInvolved={setVehiclesInvolved}
-                  vehicleTypes={vehicleTypes} setVehicleTypes={setVehicleTypes}
-                  infrastructureInvolved={infrastructureInvolved} setInfrastructureInvolved={setInfrastructureInvolved}
-                  injuredCount={injuredCount} setInjuredCount={setInjuredCount}
-                  criticalInjuries={criticalInjuries} setCriticalInjuries={setCriticalInjuries}
-                  fatalities={fatalities} setFatalities={setFatalities}
-                  trappedPersons={trappedPersons} setTrappedPersons={setTrappedPersons}
-                  weatherCondition={weatherCondition} setWeatherCondition={setWeatherCondition}
-                  visibilityLevel={visibilityLevel} setVisibilityLevel={setVisibilityLevel}
-                  roadCondition={roadCondition} setRoadCondition={setRoadCondition}
-                  fireFlag={fireFlag} setFireFlag={setFireFlag}
-                  fuelLeakFlag={fuelLeakFlag} setFuelLeakFlag={setFuelLeakFlag}
-                  chemicalHazardFlag={chemicalHazardFlag} setChemicalHazardFlag={setChemicalHazardFlag}
-                  agenciesToNotify={agenciesToNotify} setAgenciesToNotify={setAgenciesToNotify}
-                  responseStatus={responseStatus} setResponseStatus={setResponseStatus}
-                  trafficDiversionRequired={trafficDiversionRequired} setTrafficDiversionRequired={setTrafficDiversionRequired}
-                  description={description} setDescription={setDescription}
-                  confidentialFlag={confidentialFlag} setConfidentialFlag={setConfidentialFlag}
-                  enableEmail={enableEmail} setEnableEmail={setEnableEmail}
-                  enableSms={enableSms} setEnableSms={setEnableSms}
-                  enableCall={enableCall} setEnableCall={setEnableCall}
-                  officerId={officerId} setOfficerId={setOfficerId}
-                  officerDepartment={officerDepartment} setOfficerDepartment={setOfficerDepartment}
-                  cameraId={cameraId} setCameraId={setCameraId}
-                  availableZones={availableZones}
-                  onGetCurrentLocation={getCurrentLocation}
-                  detectionResult={detectionResult}
-                  stats={stats}
-                  uploading={uploading}
-                  hasFiles={uploadedFiles.length > 0}
-                  onReset={resetForm}
-                  onStop={stopAnalysis}
-                />
-              </form>
+              {/* 2. OPERATIONAL INTELLIGENCE COLUMN (Right) */}
+              <div className="lg:w-2/5 flex flex-col min-h-0">
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-10">
+                  <RightPanel
+                    disabled={uploading}
+                    incidentCategory={incidentCategory} setIncidentCategory={setIncidentCategory}
+                    priority={priority} setPriority={setPriority}
+                    location={location} setLocation={setLocation}
+                    zone={zone} setZone={setZone}
+                    city={city} setCity={setCity}
+                    district={district} setDistrict={setDistrict}
+                    stateName={stateName} setStateName={setStateName}
+                    roadHighwayId={roadHighwayId} setRoadHighwayId={setRoadHighwayId}
+                    latitude={latitude} setLatitude={setLatitude}
+                    longitude={longitude} setLongitude={setLongitude}
+                    incidentTime={incidentTime} setIncidentTime={setIncidentTime}
+                    uploadSource={uploadSource} setUploadSource={setUploadSource}
+                    vehiclesInvolved={vehiclesInvolved} setVehiclesInvolved={setVehiclesInvolved}
+                    vehicleTypes={vehicleTypes} setVehicleTypes={setVehicleTypes}
+                    infrastructureInvolved={infrastructureInvolved} setInfrastructureInvolved={setInfrastructureInvolved}
+                    injuredCount={injuredCount} setInjuredCount={setInjuredCount}
+                    criticalInjuries={criticalInjuries} setCriticalInjuries={setCriticalInjuries}
+                    fatalities={fatalities} setFatalities={setFatalities}
+                    trappedPersons={trappedPersons} setTrappedPersons={setTrappedPersons}
+                    weatherCondition={weatherCondition} setWeatherCondition={setWeatherCondition}
+                    visibilityLevel={visibilityLevel} setVisibilityLevel={setVisibilityLevel}
+                    roadCondition={roadCondition} setRoadCondition={setRoadCondition}
+                    fireFlag={fireFlag} setFireFlag={setFireFlag}
+                    fuelLeakFlag={fuelLeakFlag} setFuelLeakFlag={setFuelLeakFlag}
+                    chemicalHazardFlag={chemicalHazardFlag} setChemicalHazardFlag={setChemicalHazardFlag}
+                    agenciesToNotify={agenciesToNotify} setAgenciesToNotify={setAgenciesToNotify}
+                    responseStatus={responseStatus} setResponseStatus={setResponseStatus}
+                    trafficDiversionRequired={trafficDiversionRequired} setTrafficDiversionRequired={setTrafficDiversionRequired}
+                    description={description} setDescription={setDescription}
+                    confidentialFlag={confidentialFlag} setConfidentialFlag={setConfidentialFlag}
+                    enableEmail={enableEmail} setEnableEmail={setEnableEmail}
+                    enableSms={enableSms} setEnableSms={setEnableSms}
+                    enableCall={enableCall} setEnableCall={setEnableCall}
+                    officerId={officerId} setOfficerId={setOfficerId}
+                    officerDepartment={officerDepartment} setOfficerDepartment={setOfficerDepartment}
+                    cameraId={cameraId} setCameraId={setCameraId}
+                    availableZones={availableZones}
+                    onGetCurrentLocation={getCurrentLocation}
+                    detectionResult={detectionResult}
+                    stats={stats}
+                    uploading={uploading}
+                    hasFiles={uploadedFiles.length > 0}
+                    onReset={resetForm}
+                    onStop={stopAnalysis}
+                  />
+                </form>
+              </div>
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchAccidents } from '@/services/supabase.service';
+import { fetchAccidents } from '@/services/firebase.service';
 import type { MapMarker } from '@/features/alerts/map-view/constants/map.constants';
 import { getOtherNodes } from '@/features/alerts/map-view/constants/map.constants';
 
@@ -30,9 +30,9 @@ export const useMapData = () => {
             setAccidents(data || []);
 
             if (data && data.length > 0) {
-                const validIncidents = data.filter((a: any) => !isNaN(parseFloat(a.latitude)) && !isNaN(parseFloat(a.longitude)));
+                const validIncidents = data.filter((a: any) => !isNaN(a.latitude) && !isNaN(a.longitude));
                 if (validIncidents.length === 1) {
-                    setMapCenter([parseFloat(validIncidents[0].latitude), parseFloat(validIncidents[0].longitude)]);
+                    setMapCenter([validIncidents[0].latitude, validIncidents[0].longitude]);
                     setZoom(15);
                 }
             }
@@ -139,8 +139,8 @@ export const useMapData = () => {
 
     const incidentMarkers: MapMarker[] = (accidents || [])
         .map((a: any): MapMarker | null => {
-            const lat = parseFloat(a.latitude);
-            const lng = parseFloat(a.longitude);
+            const lat = a.latitude;
+            const lng = a.longitude;
 
             if (isNaN(lat) || isNaN(lng)) {
                 return null;
@@ -150,13 +150,13 @@ export const useMapData = () => {
                 id: a.id,
                 type: 'incident',
                 position: [lat, lng],
-                title: a.accident_code || a.incident_category || 'Incident Record',
-                status: (a.response_status || 'active').toLowerCase() as any,
-                severity: (a.operational_priority || 'medium').toLowerCase() as any,
+                title: a.id || a.category || 'Incident Record',
+                status: (a.status || 'active').toLowerCase() as any,
+                severity: (a.priority || 'medium').toLowerCase() as any,
                 details: {
-                    vehicles: a.vehicle_involvement?.[0]?.vehicle_count || 0,
-                    casualties: a.casualty_report?.[0]?.injured_count || 0,
-                    timestamp: new Date(a.observed_at || a.created_at).toLocaleTimeString(),
+                    vehicles: a.vehicleInvolvement?.count || 0,
+                    casualties: a.casualtyReport?.injuredCount || 0,
+                    timestamp: new Date(a.observedAt || a.createdAt).toLocaleTimeString(),
                     responders: [],
                     sector: a.zone || 'SECTOR-GAMMA'
                 }

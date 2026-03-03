@@ -1,4 +1,4 @@
-import { fetchAccidents } from '@/services/supabase.service';
+import { fetchAccidents } from '@/services/firebase.service';
 
 export const fetchAlertsData = async () => {
     return await fetchAccidents();

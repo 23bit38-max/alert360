@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { MOCK_USERS } from '@/data/data';
 
+
 interface LoginPageProps {
   onSwitchToSignIn: () => void;
 }
@@ -31,30 +32,37 @@ export const LoginPage = ({ onSwitchToSignIn }: LoginPageProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const { login } = useAuth();
+  const { login, mockLogin } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performLogin = async (loginEmail: string, loginPassword: string) => {
     setError('');
     setIsLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 600));
+    try {
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 600));
 
-    const demoUser = Object.values(MOCK_USERS).find(
-      u => u.email === email && (u.password === password || password === 'demo123')
-    );
+      const demoUser = Object.values(MOCK_USERS).find(
+        u => u.email === loginEmail && (u.password === loginPassword || loginPassword === 'demo123')
+      );
 
-    if (demoUser) {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Authentication failed. Please verify your credentials.');
+      if (demoUser) {
+        // Bypass Firebase Authentication completely for demo testing accounts
+        mockLogin({ ...demoUser, id: demoUser.email || 'mock_id' } as any);
+      } else {
+        // Normal user login without auto-registration
+        await login(loginEmail, loginPassword);
       }
-    } else {
-      setError('Invalid email or password. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    setIsLoading(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performLogin(email, password);
   };
 
   const mockAccounts = [
@@ -80,11 +88,14 @@ export const LoginPage = ({ onSwitchToSignIn }: LoginPageProps) => {
     }
   };
 
-  const fillCredentials = (userId: string) => {
+  const fillCredentials = async (userId: string) => {
     const user = MOCK_USERS[userId as keyof typeof MOCK_USERS];
     if (user) {
-      setEmail(user.email);
-      setPassword(user.password || 'demo123');
+      const loginEmail = user.email;
+      const loginPassword = user.password || 'demo123';
+      setEmail(loginEmail);
+      setPassword(loginPassword);
+      await performLogin(loginEmail, loginPassword);
     }
   };
 

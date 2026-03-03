@@ -27,52 +27,48 @@ export const useAlerts = () => {
             if (!data) return;
 
             const transformedAlerts: Alert[] = data.map((item: any) => {
-                const mediaRecords = item.accidents_media || [];
-                const involvement = item.vehicle_involvement?.[0] || {};
-                const casualty = item.casualty_report?.[0] || {};
-                const environment = item.environmental_conditions?.[0] || {};
+                const involvement = item.vehicleInvolvement || {};
+                const casualty = item.casualtyReport || {};
+                const environment = item.environmentalConditions || {};
 
                 const images: IncidentImage[] = [];
 
-                if (mediaRecords.length > 0) {
-                    const m = mediaRecords[0];
-                    if (m.before_image_url) {
-                        images.push({
-                            id: `${m.id}-before`,
-                            url: m.before_image_url,
-                            timestamp: new Date(m.created_at),
-                            type: 'before',
-                            description: 'Pre-Incident Capture',
-                            cameraAngle: 'Center'
-                        });
-                    }
-                    if (m.after_image_url) {
-                        images.push({
-                            id: `${m.id}-after`,
-                            url: m.after_image_url,
-                            timestamp: new Date(m.created_at),
-                            type: 'after',
-                            description: 'Incident Frame',
-                            cameraAngle: 'Center'
-                        });
-                    }
+                if (item.beforeImageUrl) {
+                    images.push({
+                        id: `${item.id}-before`,
+                        url: item.beforeImageUrl,
+                        timestamp: item.observedAt,
+                        type: 'before',
+                        description: 'Pre-Incident Capture',
+                        cameraAngle: 'Center'
+                    });
+                }
+                if (item.afterImageUrl) {
+                    images.push({
+                        id: `${item.id}-after`,
+                        url: item.afterImageUrl,
+                        timestamp: item.observedAt,
+                        type: 'after',
+                        description: 'Incident Frame',
+                        cameraAngle: 'Center'
+                    });
                 }
 
                 const mainImageUrl = images.find(img => img.type === 'after')?.url || images[0]?.url || 'https://images.unsplash.com/photo-1544829099-b9a0c5303bea?w=800&h=600&fit=crop';
 
                 return {
                     id: item.id,
-                    type: (item.operational_priority || 'medium').toLowerCase() as any,
-                    title: item.accident_code || item.incident_category?.toUpperCase() || 'INCIDENT',
+                    type: (item.priority || 'medium').toLowerCase() as any,
+                    title: item.id || item.category?.toUpperCase() || 'INCIDENT',
                     location: item.address || item.location || 'Unknown Location',
                     zone: item.zone || 'GAMMA',
-                    timestamp: new Date(item.observed_at || item.created_at),
-                    vehicles: involvement.vehicle_count || 0,
-                    confidence: (item.ai_analysis?.[0]?.confidence_score || 0) * 100 || 85,
-                    status: (item.response_status || 'active').toLowerCase() as any,
+                    timestamp: item.observedAt || item.createdAt,
+                    vehicles: involvement.count || 0,
+                    confidence: item.confidence || 85,
+                    status: (item.status || 'active').toLowerCase() as any,
                     cameraId: item.road_identifier || 'SENSOR-NODE',
-                    coordinates: { lat: parseFloat(item.latitude) || 0, lng: parseFloat(item.longitude) || 0 },
-                    description: item.incident_category || 'N/A',
+                    coordinates: { lat: item.latitude || 0, lng: item.longitude || 0 },
+                    description: item.category || 'N/A',
                     actions: ['ACKNOWLEDGE'],
                     images: images.length > 0 ? images : [{
                         id: 'placeholder',
@@ -82,25 +78,25 @@ export const useAlerts = () => {
                         description: 'Detection Frame',
                         cameraAngle: 'Center'
                     }],
-                    severity: (item.operational_priority === 'High' ? 'severe' : 'moderate') as any,
-                    responsibleDepartment: item.department === 'Police' ? 'police' : 'multi-department',
+                    severity: (item.priority === 'High' || item.priority === 'Critical' ? 'severe' : 'moderate') as any,
+                    responsibleDepartment: (item.department || 'multi-department').toLowerCase() as any,
                     detectionSource: (item.source_type || 'AI') as any,
                     city: item.city,
                     district: item.district,
-                    stateName: item.state_name,
+                    stateName: item.state,
                     roadHighwayId: item.road_identifier,
-                    vehicleTypes: involvement.vehicle_types,
-                    infrastructureInvolved: involvement.infrastructure_involved,
-                    injuredCount: casualty.injured_count,
-                    criticalInjuries: casualty.critical_injuries,
+                    vehicleTypes: involvement.types,
+                    infrastructureInvolved: involvement.infrastructure,
+                    injuredCount: casualty.injuredCount,
+                    criticalInjuries: casualty.criticalInjuries,
                     fatalities: casualty.fatalities,
-                    trappedPersons: casualty.trapped_persons,
-                    weatherCondition: environment.weather_condition,
-                    visibilityLevel: environment.visibility_level,
-                    roadCondition: environment.road_condition,
-                    fireFlag: environment.fire_flag,
-                    fuelLeakFlag: environment.fuel_leak_flag,
-                    chemicalHazardFlag: environment.chemical_hazard_flag
+                    trappedPersons: casualty.trappedPersons,
+                    weatherCondition: environment.weather,
+                    visibilityLevel: environment.visibility,
+                    roadCondition: environment.road,
+                    fireFlag: environment.fire,
+                    fuelLeakFlag: environment.fuelLeak,
+                    chemicalHazardFlag: environment.chemicalHazard
                 };
             });
 
@@ -133,7 +129,7 @@ export const useAlerts = () => {
 
     const filteredAlerts = alerts.filter(alert => {
         const matchesZoneScope = accessibleZones.includes('all') || canAccessZone(user, alert.zone);
-        const matchesDeptScope = isSuperAdmin(user) || user?.department === alert.responsibleDepartment;
+        const matchesDeptScope = isSuperAdmin(user) || user?.department?.toLowerCase() === alert.responsibleDepartment;
         const matchesSearch = alert.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             alert.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
             alert.id.toLowerCase().includes(searchQuery.toLowerCase());
@@ -159,13 +155,11 @@ export const useAlerts = () => {
         }
 
         try {
-            const { supabase } = await import('@/core/config/supabase.config');
-            const { error } = await supabase
-                .from('accidents')
-                .update({ response_status: nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1) })
-                .eq('id', alertId);
+            const { updateAccidentDoc } = await import('@/services/firebase.service');
+            await updateAccidentDoc(alertId, {
+                status: nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)
+            });
 
-            if (error) throw error;
             setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: nextStatus } : a));
         } catch (err) {
             console.error('Failed to persist status change:', err);

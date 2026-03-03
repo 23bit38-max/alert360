@@ -3,8 +3,8 @@ import { useAuth } from '@/core/auth/AuthContext';
 import { useTheme } from '@/core/theme';
 import { LoadingScreen } from '@/shared/components/LoadingScreen';
 import { getAccessibleZones, canAccessZone } from '@/shared/utils/rbac';
-import { fetchAccidents } from '@/services/supabase.service';
-import { getAIInsights, CHART_DATA } from '@/data/data';
+import { fetchAccidents, fetchAIInsights } from '@/services/firebase.service';
+import { CHART_DATA } from '@/data/data';
 
 // Modular Components
 import { KPIGrid } from '@/features/dashboard/components/KPIGrid';
@@ -18,12 +18,20 @@ export const Dashboard = () => {
   useTheme();
   const [loading, setLoading] = useState(true);
   const [accidents, setAccidents] = useState<any[]>([]);
+  const [aiInsights, setAiInsights] = useState<any[]>([]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const data = await fetchAccidents();
-      setAccidents(data || []);
+      const [accidentsData, insightsData] = await Promise.all([
+        fetchAccidents(),
+        fetchAIInsights()
+      ]);
+      setAccidents(accidentsData || []);
+      setAiInsights(insightsData.map(i => ({
+        ...i,
+        type: ['warning', 'prediction', 'analysis', 'optimization', 'critical', 'insight'].includes(i.type) ? i.type : 'analysis'
+      })));
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -46,16 +54,16 @@ export const Dashboard = () => {
   const recentAlerts = rawAlerts
     .map((a: any) => ({
       id: a.id,
-      type: a.operational_priority?.toLowerCase() === 'critical' ? 'critical' :
-        a.operational_priority?.toLowerCase() === 'high' ? 'high' :
-          a.operational_priority?.toLowerCase() === 'medium' ? 'medium' : 'low',
+      type: a.priority?.toLowerCase() === 'critical' ? 'critical' :
+        a.priority?.toLowerCase() === 'high' ? 'high' :
+          a.priority?.toLowerCase() === 'medium' ? 'medium' : 'low',
       location: a.address || a.location || 'Unknown Location',
-      time: new Date(a.observed_at || a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: a.response_status || 'Active',
-      vehicles: a.vehicle_involvement?.[0]?.vehicle_count || 0,
+      time: a.observedAt ? new Date(a.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+      status: a.status || 'Active',
+      vehicles: a.vehicleInvolvement?.count || 0,
       department: a.department?.toLowerCase() || 'multi-department',
       zone: a.zone,
-      casualties: a.casualty_report?.[0]?.injured_count || 0,
+      casualties: a.casualtyReport?.injuredCount || 0,
     }))
     .slice(0, 8);
 
@@ -71,11 +79,6 @@ export const Dashboard = () => {
     fire: { accidents: Math.floor(accidents.length * 0.3), responders: 4 },
     hospital: { accidents: Math.floor(accidents.length * 0.3), responders: 3 },
   };
-
-  const aiInsights = (getAIInsights(user?.role) || []).slice(0, 3).map((insight: any) => ({
-    ...insight,
-    type: ['warning', 'prediction', 'analysis', 'optimization', 'critical'].includes(insight.type) ? insight.type : 'analysis'
-  }));
 
   return (
     <div className="page-container animate-in fade-in duration-1000 pb-24 lg:pb-12 max-w-[1700px] mx-auto space-y-10">
