@@ -16,8 +16,7 @@ export const useIncidentDetail = (initialIncident: Alert) => {
         }
 
         try {
-            const { error } = await updateAccidentStatus(incident.id, nextStatus);
-            if (error) throw error;
+            await updateAccidentStatus(incident.id, nextStatus);
             setIncident(prev => ({ ...prev, status: nextStatus }));
         } catch (err) {
             console.error('Failed to persist status change:', err);
