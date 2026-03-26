@@ -47,24 +47,35 @@ export const Dashboard = () => {
   if (loading) return <LoadingScreen message="Compiling Real-time Detection Data..." />;
 
   const accessibleZones = getAccessibleZones(user);
-  const rawAlerts = accidents.filter((alert: any) =>
-    accessibleZones.includes('all') || canAccessZone(user, alert.zone)
-  );
+  const rawAlerts = accidents.filter((alert: any) => {
+    if (user?.role === 'super_admin') return true;
+
+    const zone = alert.zone || 'GAMMA';
+    return accessibleZones.includes('all') ||
+      accessibleZones.includes(zone) ||
+      zone === 'GAMMA' ||
+      canAccessZone(user, zone);
+  });
 
   const recentAlerts = rawAlerts
-    .map((a: any) => ({
-      id: a.id,
-      type: a.priority?.toLowerCase() === 'critical' ? 'critical' :
-        a.priority?.toLowerCase() === 'high' ? 'high' :
-          a.priority?.toLowerCase() === 'medium' ? 'medium' : 'low',
-      location: a.address || a.location || 'Unknown Location',
-      time: a.observedAt ? new Date(a.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
-      status: a.status || 'Active',
-      vehicles: a.vehicleInvolvement?.count || 0,
-      department: a.department?.toLowerCase() || 'multi-department',
-      zone: a.zone,
-      casualties: a.casualtyReport?.injuredCount || 0,
-    }))
+    .map((a: any) => {
+      const priorityStr = (a.priority || 'P2 - Medium').toLowerCase();
+      const isCritical = priorityStr.includes('critical');
+      const isHigh = priorityStr.includes('high') || priorityStr.includes('p1') || isCritical;
+      const isMedium = priorityStr.includes('medium') || priorityStr.includes('p2');
+
+      return {
+        id: a.id,
+        type: isCritical ? 'critical' : isHigh ? 'high' : isMedium ? 'medium' : 'low',
+        location: a.address || a.location || 'Unknown Location',
+        time: a.observedAt ? new Date(a.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+        status: a.status || 'Active',
+        vehicles: a.vehicleInvolvement?.count || 0,
+        department: a.department?.toLowerCase() || 'multi-department',
+        zone: a.zone || 'GAMMA',
+        casualties: (a.casualtyReport?.injuredCount || 0) + (a.casualtyReport?.fatalities || 0),
+      };
+    })
     .slice(0, 8);
 
   const kpiData = {

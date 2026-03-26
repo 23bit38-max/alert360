@@ -10,6 +10,17 @@ backend/**/*.weights
 backend/**/*.h5
 
 # Local environment
-backend/.venv/
-backend/__pycache__/
-backend/.env
+backend/**/.venv/
+backend/**/__pycache__/
+backend/**/.env
+.venv/
+__pycache__/
+.env
+.env.*
+.DS_Store
+
+# Temporary outputs
+backend/storage/uploads/
+backend/storage/outputs/
+backend/storage/models/
+backend/storage/logs/

@@ -16,7 +16,10 @@ import {
     Car,
     Clock,
     Zap,
-    Eye
+    Eye,
+    ShieldAlert,
+    Navigation,
+    Layers
 } from 'lucide-react';
 import type { Alert } from '@/features/alerts/real-time-alerts/constants/alerts.types';
 
@@ -111,6 +114,14 @@ export const AlertCard = ({ alert, setMapCenter, setSelectedIncident, handleActi
                         <div className="flex items-center gap-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">
                             <MapPin size={12} className="text-primary" /> {alert.location}
                         </div>
+                        <div className="flex gap-2 mt-2">
+                            <Badge className="bg-blue-500/10 border border-blue-500/20 text-[7px] font-black uppercase text-blue-400 px-2 py-0.5">
+                                {alert.responsibleDepartment || 'POLICE'}
+                            </Badge>
+                            <Badge className="bg-white/5 border border-white/10 text-[7px] font-black uppercase text-white/40 px-2 py-0.5">
+                                {alert.detectionSource || 'AI_FORENSIC'}
+                            </Badge>
+                        </div>
                     </div>
                     <div className="text-right">
                         <p className="text-[10px] font-mono text-white/30 tabular-nums">{alert.timestamp.toLocaleTimeString()}</p>
@@ -138,6 +149,37 @@ export const AlertCard = ({ alert, setMapCenter, setSelectedIncident, handleActi
                     </motion.div>
                 </div>
 
+                {/* ACCIDENT DATA CARDS (QUICK INTEL) */}
+                <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 custom-scrollbar-hide">
+                    <div className="flex-none w-[120px] p-3 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[7px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1">
+                            <ShieldAlert size={8} /> Risk Lvl
+                        </span>
+                        <Badge className={`text-[8px] font-black uppercase ${alert.casualtyLikelihood === 'high' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`}>
+                            {alert.casualtyLikelihood || 'LOW'}
+                        </Badge>
+                    </div>
+
+                    <div className="flex-none w-[120px] p-3 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[7px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1">
+                            <Navigation size={8} /> Traffic
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${alert.trafficDiversionRequired ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
+                            <span className="text-[9px] font-black text-white/60 uppercase">{alert.trafficDiversionRequired ? 'Diverting' : 'Normal'}</span>
+                        </div>
+                    </div>
+
+                    {alert.infrastructureInvolved && alert.infrastructureInvolved.length > 0 && (
+                        <div className="flex-none w-[120px] p-3 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                            <span className="text-[7px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1">
+                                <Layers size={8} /> Assets
+                            </span>
+                            <span className="text-[9px] font-black text-primary uppercase truncate block">{alert.infrastructureInvolved[0]}</span>
+                        </div>
+                    )}
+                </div>
+
                 {/* OPERATIONAL TELEMETRY STRIP */}
                 <div className="flex items-center justify-between px-2 py-3 border-y border-white/5 bg-white/[0.01]">
                     <div className="flex flex-col gap-1 items-center">
@@ -163,14 +205,14 @@ export const AlertCard = ({ alert, setMapCenter, setSelectedIncident, handleActi
                             <span className="text-[10px] font-black truncate max-w-[60px]">{alert.weatherCondition || 'N/A'}</span>
                         </div>
                     </div>
-                    {alert.fireFlag && (
+                    {(alert.fireFlag || alert.fuelLeakFlag) && (
                         <>
                             <div className="w-px h-6 bg-white/5" />
                             <div className="flex flex-col gap-1 items-center">
                                 <span className="text-[7px] font-black text-red-500 uppercase tracking-widest">Hazard</span>
                                 <div className="flex items-center gap-1.5 text-red-500 animate-pulse">
                                     <Flame size={10} />
-                                    <span className="text-[10px] font-black">FIRE</span>
+                                    <span className="text-[10px] font-black">{alert.fireFlag ? 'FIRE' : 'LEAK'}</span>
                                 </div>
                             </div>
                         </>

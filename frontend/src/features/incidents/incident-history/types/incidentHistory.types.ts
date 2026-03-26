@@ -37,7 +37,13 @@ export interface Alert {
     agenciesToNotify?: string[];
     reportGenerated: boolean;
     handledBy: string;
-    weather?: string;
+    weather: string;
     incidentType: string;
     roadConditionVal?: string;
+    officerId?: string;
+    officerDepartment?: string;
+    detectionSource?: string;
+    confidentialFlag?: boolean;
+    trafficDiversionRequired?: boolean;
+    casualtyLikelihood?: 'low' | 'moderate' | 'high';
 }

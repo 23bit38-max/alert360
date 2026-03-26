@@ -100,6 +100,13 @@ export const useManualUpload = () => {
         }
     }, [userDepartment]);
 
+    useEffect(() => {
+        if (user) {
+            setOfficerId(user.name || 'ROOT_AGENT');
+            setOfficerDepartment(user.department || 'Police');
+        }
+    }, [user]);
+
     // Auto-fill from AI Detection
     useEffect(() => {
         if (detectionResult?.accidentDetected) {
@@ -252,57 +259,55 @@ export const useManualUpload = () => {
             // 1. Generate Accident ID FIRST (MANDATORY)
             const accidentId = crypto.randomUUID();
 
-            // 2. PRE-CREATE Accident Record and Operational Data
-            // This ensures the ID exists in the DB so backend can write media
+            // 2. Initial DB Registration
+            // We save the "expected" metadata first, then update it with AI results
             const incidentData = {
+                title: `INCIDENT_${accidentId.substring(0, 8).toUpperCase()}`,
                 category: incidentCategory,
-                priority,
-                location,
-                zone,
-                city,
-                district,
+                priority: priority,
+                location: location,
+                zone: zone,
+                city: city,
+                district: district,
                 state: stateName,
-                roadHighwayId,
-                latitude: latitude || null,
-                longitude: longitude || null,
-                incidentTime: incidentTime || new Date().toTimeString().split(' ')[0],
-                uploadSource,
-                vehicles: {
-                    count: vehiclesInvolved || null,
+                road_identifier: roadHighwayId,
+                latitude: parseFloat(latitude) || 19.0760,
+                longitude: parseFloat(longitude) || 72.8777,
+                incidentTime: incidentTime,
+                source: uploadSource,
+                status: 'responding',
+                vehicleInvolvement: {
+                    count: parseInt(vehiclesInvolved) || 0,
                     types: vehicleTypes,
                     infrastructure: infrastructureInvolved
                 },
-                medical: {
-                    injuredCount,
-                    criticalInjuries,
-                    fatalities,
-                    trappedPersons
+                casualtyReport: {
+                    injuredCount: parseInt(injuredCount) || 0,
+                    criticalInjuries: parseInt(criticalInjuries) || 0,
+                    fatalities: parseInt(fatalities) || 0,
+                    trappedPersons: trappedPersons
                 },
-                environment: {
-                    weatherCondition,
-                    visibilityLevel,
-                    roadCondition,
-                    hazards: {
-                        fire: fireFlag,
-                        fuelLeak: fuelLeakFlag,
-                        chemical: chemicalHazardFlag
-                    }
+                environmentalConditions: {
+                    weather: weatherCondition,
+                    visibility: visibilityLevel,
+                    road: roadCondition,
+                    fire: fireFlag,
+                    fuelLeak: fuelLeakFlag,
+                    chemicalHazard: chemicalHazardFlag
                 },
-                response: {
-                    agenciesToNotify,
-                    status: responseStatus,
-                    trafficDiversion: trafficDiversionRequired
+                agencyDispatch: {
+                    agencies: agenciesToNotify,
+                    status: 'dispatched'
                 },
-                description,
-                isConfidential: confidentialFlag,
-                meta: {
-                    officerId,
+                officerNotes: [{
+                    text: description,
+                    officerId: officerId,
                     department: officerDepartment,
-                    cameraId,
-                    uploadedBy: user?.name,
-                    uploadedByRole: user?.role
-                },
-                createdAt: new Date().toISOString(),
+                    isConfidential: confidentialFlag
+                }],
+                department: officerDepartment || 'Police',
+                confidentialFlag: confidentialFlag,
+                trafficDiversionRequired: trafficDiversionRequired
             };
 
             const syncToastId = toast.loading('Establishing Operational Log...');
@@ -353,7 +358,7 @@ export const useManualUpload = () => {
                     if (result.boxes) {
                         await updateAccidentDoc(accidentId, {
                             vehicleInvolvement: {
-                                ...incidentData.vehicles,
+                                ...incidentData.vehicleInvolvement,
                                 count: result.boxes.length
                             }
                         });

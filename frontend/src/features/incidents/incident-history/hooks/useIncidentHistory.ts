@@ -72,12 +72,21 @@ export const useIncidentHistory = () => {
     }, [incidents, colors]);
 
     const filteredIncidents = incidents.filter(incident => {
-        const matchesZone = accessibleZones.includes('all') || canAccessZone(user, incident.zone);
-        const matchesDept = isSuperAdmin(user) || incident.responsibleDepartment === user?.department;
+        // If super admin, bypass all filters
+        if (isSuperAdmin(user)) return true;
+
+        const incidentZone = incident.zone || 'central-Mumbai';
+        const matchesZone = accessibleZones.includes('all') ||
+            accessibleZones.includes(incidentZone) ||
+            incidentZone === 'GAMMA' || // Allow default zone
+            canAccessZone(user, incidentZone);
+
+        const matchesDept = incident.responsibleDepartment === user?.department;
         const matchesType = selectedType === 'all' || incident.type === selectedType;
         const matchesSeverity = selectedSeverity === 'all' || incident.severity === selectedSeverity;
         const matchesSearch = incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             incident.location.toLowerCase().includes(searchQuery.toLowerCase());
+
         return matchesZone && matchesDept && matchesType && matchesSeverity && matchesSearch;
     });
 

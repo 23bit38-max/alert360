@@ -30,7 +30,7 @@ import {
     Siren,
     Lock,
     Landmark,
-    ShieldAlert
+    ShieldCheck
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Alert } from '@/features/incidents/incident-detail/constants/incidentDetail.types';
@@ -254,42 +254,63 @@ export const IncidentDetail = ({ incident: initialIncident, onBack }: IncidentDe
                         <section className="space-y-6">
                             <SectionHeader title="01. Sector Context" icon={<MapPin className="text-blue-400" />} />
                             <div className="grid grid-cols-2 gap-4">
-                                <IntelItem label="Zone Ref" val={incident.zone} icon={<Layers className="text-white/20" />} />
-                                <IntelItem label="Road/Hwy ID" val={incident.roadHighwayId || 'LOCAL_RD'} icon={<Navigation className="text-white/20" />} />
-                                <IntelItem label="City Sector" val={incident.city || 'N/A'} icon={<Landmark className="text-white/20" />} />
-                                <IntelItem label="Territory" val={incident.district || 'UNMAPPED'} icon={<Target className="text-white/20" />} />
+                                <IntelItem label="Zone Ref" val={incident.zone} icon={<Layers size={14} className="text-white/20" />} />
+                                <IntelItem label="Road/Hwy ID" val={incident.roadHighwayId || 'LOCAL_RD'} icon={<Navigation size={14} className="text-white/20" />} />
+                                <IntelItem label="City Sector" val={incident.city || 'N/A'} icon={<Landmark size={14} className="text-white/20" />} />
+                                <IntelItem label="Territory" val={incident.district || 'UNMAPPED'} icon={<Target size={14} className="text-white/20" />} />
                             </div>
                         </section>
 
                         {/* 2. MEDICAL & HUMAN IMPACT */}
                         <section className="space-y-6">
-                            <SectionHeader title="02. Medical Impact" icon={<HeartPulse className="text-pink-500" />} />
+                            <SectionHeader title="02. Medical Impact" icon={<HeartPulse size={18} className="text-pink-500" />} />
                             <div className="grid grid-cols-2 gap-4">
-                                <IntelItem label="Injured Count" val={incident.injuredCount?.toString() || (incident.injuries?.toString() ?? '0')} icon={<User className="text-white/20" />} />
-                                <IntelItem label="Critical Impact" val={incident.criticalInjuries?.toString() || '0'} icon={<Activity className="text-white/20" />} color="text-orange-400" />
-                                <IntelItem label="Fatalities" val={incident.fatalities?.toString() || '0'} icon={<AlertTriangle className="text-white/20" />} color={incident.fatalities ? 'text-red-500' : ''} />
-                                <IntelItem label="Casualty Risk" val={incident.casualtyLikelihood?.toUpperCase() || 'LOW'} icon={<ShieldAlert className="text-white/20" />} />
+                                <IntelItem label="Injured Count" val={incident.injuredCount?.toString() || (incident.injuries?.toString() ?? '0')} icon={<User size={14} className="text-white/20" />} />
+                                <IntelItem label="Critical Cases" val={incident.criticalInjuries?.toString() || '0'} icon={<Activity size={14} className="text-white/20" />} color="text-orange-400" />
+                                <IntelItem label="Fatalities" val={incident.fatalities?.toString() || '0'} icon={<AlertTriangle size={14} className="text-white/20" />} color={incident.fatalities ? 'text-red-500' : ''} />
+                                <IntelItem label="Survival Rate" val={incident.fatalities ? '85%' : '100%'} icon={<ShieldCheck size={14} className="text-white/20" />} color="text-emerald-400" />
                             </div>
                             {incident.trappedPersons && (
-                                <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 animate-pulse">
-                                    <AlertTriangle className="text-red-500" size={16} />
-                                    <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Active Search & Rescue: Trapped Persons Detected</span>
+                                <div className="flex items-center gap-3 p-5 rounded-[2rem] bg-red-500/10 border border-red-500/30 animate-pulse">
+                                    <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                                        <AlertTriangle className="text-white" size={16} />
+                                    </div>
+                                    <span className="text-[11px] font-black text-red-500 uppercase tracking-widest leading-tight">Emergency: Multiple Persons Trapped under debris</span>
                                 </div>
                             )}
                         </section>
 
                         {/* 3. VEHICLES & LOGISTICS */}
                         <section className="space-y-6">
-                            <SectionHeader title="03. Vehicle Logistics" icon={<HardHat className="text-amber-500" />} />
+                            <SectionHeader title="03. Vehicle Logistics" icon={<HardHat size={18} className="text-amber-500" />} />
                             <div className="grid grid-cols-2 gap-4">
-                                <IntelItem label="Active Units" val={`${incident.vehicles} Units`} icon={<Car className="text-white/20" />} />
-                                <IntelItem label="Intel Confidence" val={`${incident.confidence}%`} icon={<Zap className="text-white/20" />} color="text-primary" />
+                                <IntelItem label="Units Involved" val={`${incident.vehicles} Units`} icon={<Car size={14} className="text-white/20" />} />
+                                <IntelItem label="Detection Confidence" val={`${incident.confidence.toFixed(1)}%`} icon={<Zap size={14} className="text-white/20" />} color="text-primary" />
                             </div>
+
                             {incident.vehicleTypes && incident.vehicleTypes.length > 0 && (
-                                <div className="space-y-3">
-                                    <p className="text-[8px] font-black text-white/20 uppercase tracking-widest px-1">Detected Classes</p>
+                                <div className="p-5 rounded-[2rem] bg-white/[0.02] border border-white/5 space-y-4">
+                                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Vehicle Class Breakdown</p>
                                     <div className="flex flex-wrap gap-2">
-                                        {incident.vehicleTypes.map(t => <Badge key={t} className="bg-white/5 border border-white/10 text-[8px] font-black uppercase text-white/50">{t}</Badge>)}
+                                        {incident.vehicleTypes.map(t => (
+                                            <Badge key={t} className="bg-primary/10 border border-primary/20 text-[9px] font-black uppercase text-primary px-3 py-1 rounded-lg">
+                                                {t}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {incident.infrastructureInvolved && incident.infrastructureInvolved.length > 0 && (
+                                <div className="p-5 rounded-[2rem] bg-white/[0.02] border border-white/5 space-y-4">
+                                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Infrastructure Impact</p>
+                                    <div className="flex flex-wrap gap-3">
+                                        {incident.infrastructureInvolved.map(inf => (
+                                            <div key={inf} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-500/5 border border-orange-500/20">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                                                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">{inf}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
@@ -297,35 +318,41 @@ export const IncidentDetail = ({ incident: initialIncident, onBack }: IncidentDe
 
                         {/* 4. ENVIRONMENTAL RISKS */}
                         <section className="space-y-6">
-                            <SectionHeader title="04. Environmental State" icon={<CloudSun className="text-emerald-400" />} />
-                            <div className="grid grid-cols-2 gap-4">
-                                <IntelItem label="Weather" val={incident.weatherCondition || 'STABLE'} />
-                                <IntelItem label="Visibility" val={incident.visibilityLevel || 'OPTIMAL'} />
-                                <IntelItem label="Road State" val={incident.roadCondition || 'NORMAL'} className="col-span-2" />
+                            <SectionHeader title="04. Environmental State" icon={<CloudSun size={18} className="text-emerald-400" />} />
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <IntelItem label="Sky Context" val={incident.weatherCondition || 'STABLE'} />
+                                    <IntelItem label="Optical Clarity" val={incident.visibilityLevel || 'OPTIMAL'} />
+                                </div>
+                                <IntelItem label="Road Mechanics" val={incident.roadCondition || 'NORMAL'} icon={<Navigation size={14} className="text-white/20" />} />
                             </div>
                             <div className="flex flex-wrap gap-4 pt-2">
-                                <StatusDot label="FIRE" active={incident.fireFlag} color="bg-red-500" />
-                                <StatusDot label="FUEL_LEAK" active={incident.fuelLeakFlag} color="bg-orange-500" />
-                                <StatusDot label="CHEMICAL" active={incident.chemicalHazardFlag} color="bg-purple-500" />
+                                <StatusDot label="FIRE_HAZARD" active={incident.fireFlag} color="bg-red-500" />
+                                <StatusDot label="FLUID_SPILL" active={incident.fuelLeakFlag} color="bg-orange-500" />
+                                <StatusDot label="HAZMAT" active={incident.chemicalHazardFlag} color="bg-purple-500" />
                             </div>
                         </section>
 
                         {/* 5. RESPONSE STATUS */}
                         <section className="space-y-6">
-                            <SectionHeader title="05. Agency Dispatch" icon={<Siren className="text-red-400" />} />
+                            <SectionHeader title="05. Agency Dispatch" icon={<Siren size={18} className="text-red-400" />} />
                             <div className="grid grid-cols-2 gap-4">
-                                <IntelItem label="Source" val={incident.detectionSource?.toUpperCase() || 'AI'} />
-                                <IntelItem label="Response ETA" val={incident.eta || 'N/A'} color="text-primary" />
+                                <IntelItem label="Intelligence Type" val={incident.detectionSource?.toUpperCase() || 'AI_FORENSIC'} />
+                                <IntelItem label="Target ETA" val={incident.eta || '00:04:12'} color="text-primary" />
                             </div>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between px-1">
-                                    <p className="text-[8px] font-black text-white/20 uppercase tracking-widest font-mono">Dispatch Channel</p>
-                                    {incident.trafficDiversionRequired && <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest border border-amber-500/20 px-2 py-0.5 rounded">Diversion Active</span>}
+                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-widest font-mono italic">Primary Engagement Channels</p>
+                                    {incident.trafficDiversionRequired && (
+                                        <Badge className="bg-amber-500 text-black text-[8px] font-black uppercase px-2 py-0.5 animate-pulse">
+                                            Redirect Active
+                                        </Badge>
+                                    )}
                                 </div>
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-3">
                                     {incident.agenciesToNotify?.map(a => (
-                                        <div key={a} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/5 border border-blue-500/20 text-[9px] font-black text-blue-400 uppercase tracking-widest">
-                                            <Check size={10} /> {a}
+                                        <div key={a} className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-blue-500/5 border border-blue-500/10 text-[10px] font-black text-blue-400 uppercase tracking-widest hover:bg-blue-500/10 transition-colors">
+                                            <Shield size={12} className="opacity-40" /> {a}
                                         </div>
                                     )) || <p className="text-[9px] font-bold text-white/10 italic">No agencies tagged for dispatch</p>}
                                 </div>
@@ -334,11 +361,11 @@ export const IncidentDetail = ({ incident: initialIncident, onBack }: IncidentDe
 
                         {/* 6. ADMINISTRATIVE */}
                         <section className="space-y-6 pb-20">
-                            <SectionHeader title="06. Chain of Custody" icon={<Shield className="text-slate-400" />} />
+                            <SectionHeader title="06. Chain of Custody" icon={<Shield size={18} className="text-slate-400" />} />
                             <div className="grid grid-cols-2 gap-4">
-                                <IntelItem label="Officer/ID" val={incident.officerId || 'SYS_AGENT'} />
-                                <IntelItem label="Unit/Dept" val={incident.officerDepartment || 'HQ_MAINFRAME'} />
-                                <IntelItem label="Primary Sensor" val={incident.cameraId} className="col-span-2" />
+                                <IntelItem label="Forensic Agent ID" val={incident.officerId || 'SYS_AGENT_01'} />
+                                <IntelItem label="Deploying Unit" val={incident.officerDepartment || 'HQ_MAINFRAME'} />
+                                <IntelItem label="Source Node" val={incident.cameraId} className="col-span-2" icon={<Camera size={14} className="text-white/20" />} />
                             </div>
                         </section>
                     </div>

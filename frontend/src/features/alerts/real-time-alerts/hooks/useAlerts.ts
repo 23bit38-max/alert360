@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/core/auth/AuthContext';
 import { useNotifications } from '@/shared/components/NotificationService';
-import { getAccessibleZones, canAccessZone, isSuperAdmin } from '@/shared/utils/rbac';
+import { getAccessibleZones, canAccessZone, isSuperAdmin, getUserDepartment } from '@/shared/utils/rbac';
 import type { Alert, IncidentImage } from '@/features/alerts/real-time-alerts/constants/alerts.types';
 import { fetchAlertsData } from '@/features/alerts/real-time-alerts/services/alerts.service';
 
@@ -96,7 +96,9 @@ export const useAlerts = () => {
                     roadCondition: environment.road,
                     fireFlag: environment.fire,
                     fuelLeakFlag: environment.fuelLeak,
-                    chemicalHazardFlag: environment.chemicalHazard
+                    chemicalHazardFlag: environment.chemicalHazard,
+                    casualtyLikelihood: item.casualtyLikelihood || (casualty.fatalities > 0 ? 'high' : casualty.injuredCount > 0 ? 'moderate' : 'low'),
+                    trafficDiversionRequired: item.trafficDiversionRequired || false
                 };
             });
 
@@ -128,11 +130,28 @@ export const useAlerts = () => {
     }, [alerts]);
 
     const filteredAlerts = alerts.filter(alert => {
-        const matchesZoneScope = accessibleZones.includes('all') || canAccessZone(user, alert.zone);
-        const matchesDeptScope = isSuperAdmin(user) || user?.department?.toLowerCase() === alert.responsibleDepartment;
+        // 1. Core Visibility (RBAC & Scoping)
+        const isSA = isSuperAdmin(user);
+        const zone = alert.zone || 'GAMMA';
+        const dept = (alert.responsibleDepartment || 'multi-department').toLowerCase();
+        const userDept = getUserDepartment(user).toLowerCase();
+
+        const matchesZoneScope = isSA ||
+            accessibleZones.includes('all') ||
+            canAccessZone(user, zone) ||
+            zone === 'GAMMA';
+
+        const matchesDeptScope = isSA ||
+            user?.role === 'monitoring_operator' ||
+            user?.role === 'auditor' ||
+            dept === 'multi-department' ||
+            userDept === dept;
+
+        // 2. User-driven Filters
         const matchesSearch = alert.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             alert.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
             alert.id.toLowerCase().includes(searchQuery.toLowerCase());
+
         const matchesFilterZone = selectedZone === 'all' || alert.zone === selectedZone;
         const matchesSeverity = selectedSeverity === 'all' || alert.type === selectedSeverity;
 

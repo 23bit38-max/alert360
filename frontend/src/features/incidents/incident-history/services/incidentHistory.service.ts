@@ -19,7 +19,6 @@ export const incidentHistoryService = {
                 const casualty = item.casualtyReport || {};
                 const environment = item.environmentalConditions || {};
                 const dispatch = item.agencyDispatch || {};
-                const notes = item.officerNotes || {};
 
                 const images: any[] = [];
                 if (item.beforeImageUrl) {
@@ -43,23 +42,32 @@ export const incidentHistoryService = {
                     });
                 }
 
+                const priorityStr = (item.priority || 'P2 - Medium').toLowerCase();
+                const isHigh = priorityStr.includes('high') || priorityStr.includes('p1') || priorityStr.includes('critical');
+                const isMedium = priorityStr.includes('medium') || priorityStr.includes('p2');
+
+                // Correctly access officer notes array
+                const officerNote = Array.isArray(item.officerNotes) && item.officerNotes.length > 0
+                    ? item.officerNotes[0]
+                    : (item.officerNotes || {});
+
                 return {
                     id: item.id,
-                    title: item.id || item.category?.toUpperCase() || 'INCIDENT',
-                    type: (item.priority || 'medium').toLowerCase() as any,
+                    title: item.title || item.id || `INCIDENT_${item.id?.substring(0, 8).toUpperCase()}` || 'INCIDENT',
+                    type: (isHigh ? 'critical' : isMedium ? 'high' : 'medium') as any,
                     incidentType: (item.category || 'other').toLowerCase(),
-                    severity: (item.priority === 'High' || item.priority === 'Critical' ? 'severe' : 'moderate') as any,
+                    severity: (isHigh ? 'severe' : 'moderate') as any,
                     location: item.address || item.location || 'Unknown',
                     zone: item.zone || 'GAMMA',
-                    timestamp: item.observedAt || item.createdAt,
+                    timestamp: item.observedAt || item.createdAt || new Date(),
                     vehicles: involvement.count || 0,
                     casualties: (casualty.injuredCount || 0) + (casualty.fatalities || 0),
                     responseTime: item.responseTime || 3.8,
                     assignedUnits: dispatch.agencies || [],
-                    status: (item.status || 'resolved').toLowerCase() as any,
+                    status: (item.status || 'active').toLowerCase() as any,
                     confidence: item.confidence || 85,
                     cameraId: item.road_identifier || 'SENSOR-NODE',
-                    coordinates: { lat: item.latitude || 0, lng: item.longitude || 0 },
+                    coordinates: { lat: item.latitude || 19.0760, lng: item.longitude || 72.8777 },
                     images: images.length > 0 ? images : [{
                         id: 'placeholder',
                         url: 'https://images.unsplash.com/photo-1544829099-b9a0c5303bea?w=800&h=600&fit=crop',
@@ -68,32 +76,38 @@ export const incidentHistoryService = {
                         description: 'Detection Frame',
                         cameraAngle: 'Center'
                     }],
-                    description: item.category || 'N/A',
+                    description: officerNote.text || item.description || item.category || 'N/A',
                     actions: ['ACKNOWLEDGE'],
                     city: item.city,
                     district: item.district,
                     stateName: item.state,
                     roadHighwayId: item.road_identifier,
-                    vehicleTypes: involvement.types,
-                    infrastructureInvolved: involvement.infrastructure,
-                    injuredCount: casualty.injuredCount,
-                    criticalInjuries: casualty.criticalInjuries,
-                    fatalities: casualty.fatalities,
-                    trappedPersons: casualty.trappedPersons,
-                    weatherCondition: environment.weather,
-                    visibilityLevel: environment.visibility,
-                    roadCondition: environment.road,
-                    fireFlag: environment.fire,
-                    fuelLeakFlag: environment.fuelLeak,
-                    chemicalHazardFlag: environment.chemicalHazard,
-                    agenciesToNotify: dispatch.agencies,
+                    vehicleTypes: involvement.types || [],
+                    infrastructureInvolved: involvement.infrastructure || [],
+                    injuredCount: casualty.injuredCount || 0,
+                    criticalInjuries: casualty.criticalInjuries || 0,
+                    fatalities: casualty.fatalities || 0,
+                    trappedPersons: casualty.trappedPersons || false,
+                    weatherCondition: environment.weather || 'Clear',
+                    visibilityLevel: environment.visibility || 'Good',
+                    roadCondition: environment.road || 'Dry',
+                    fireFlag: environment.fire || false,
+                    fuelLeakFlag: environment.fuelLeak || false,
+                    chemicalHazardFlag: environment.chemicalHazard || false,
+                    agenciesToNotify: dispatch.agencies || [],
+                    trafficDiversionRequired: item.trafficDiversionRequired || false,
+                    confidentialFlag: item.confidentialFlag || false,
                     reportGenerated: true,
-                    responsibleDepartment: (item.department || 'police').toLowerCase() as any,
-                    handledBy: notes.officerId || 'SYSTEM',
+                    responsibleDepartment: (item.department || 'Police').toLowerCase() as any,
+                    handledBy: officerNote.officerId || 'SYSTEM',
+                    officerId: officerNote.officerId || 'SYSTEM',
+                    officerDepartment: officerNote.department || item.department || 'HQ_MAINFRAME',
+                    detectionSource: item.source || 'AI',
+                    casualtyLikelihood: (casualty.fatalities > 0 ? 'high' : casualty.injuredCount > 1 ? 'moderate' : 'low') as any,
                     weather: (environment.weather || 'clear').toLowerCase() as any,
                     roadConditionVal: (environment.road || 'dry').toLowerCase() as any
                 };
-            });
+            }).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
         } catch (err) {
             console.error('Failed to load history:', err);
             return [];
