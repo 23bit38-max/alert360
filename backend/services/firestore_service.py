@@ -15,10 +15,18 @@ load_dotenv()
 def get_firestore_client():
     if not firebase_admin._apps:
         # Use service account values from environment variables
+        raw_key = os.getenv("FIREBASE_PRIVATE_KEY", "")
+        # Remove any surrounding quotes the user might have accidentally pasted
+        if raw_key.startswith('"') and raw_key.endswith('"'):
+            raw_key = raw_key[1:-1]
+        
+        # Replace escaped newlines with actual newlines
+        clean_key = raw_key.replace("\\n", "\n")
+        
         cred_dict = {
             "type": "service_account",
             "project_id": os.getenv("FIREBASE_PROJECT_ID"),
-            "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace("\\n", "\n"),
+            "private_key": clean_key,
             "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
             "token_uri": "https://oauth2.googleapis.com/token",
         }
