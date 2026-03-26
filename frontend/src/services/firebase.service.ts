@@ -51,7 +51,10 @@ export const fetchAccidents = async (): Promise<Accident[]> => {
         console.error("Error in fetchAccidents:", error);
         // Fallback to python backend api which bypasses rules
         try {
-            const API_BASE_URL = import.meta.env.VITE_LOCAL_BACKEND_URL || 'http://localhost:8000';
+            const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+            const LOCAL_URL = import.meta.env.VITE_LOCAL_BACKEND_URL || 'http://localhost:8000';
+            const RENDER_URL = import.meta.env.VITE_RENDER_BACKEND_URL || 'https://alert360.onrender.com';
+            const API_BASE_URL = isLocal ? LOCAL_URL : RENDER_URL;
             const res = await fetch(`${API_BASE_URL}/api/accidents`);
             if (res.ok) {
                 const data = await res.json();

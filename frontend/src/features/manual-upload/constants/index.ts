@@ -12,11 +12,6 @@ if (isLocal) {
         console.warn('Local backend unreachable. Switching to Render.');
         API_BASE_URL = RENDER_URL;
     });
-} else {
-    fetch(`${RENDER_URL}/health`).catch(() => {
-        console.warn('Render backend unreachable. Switching to Localhost.');
-        API_BASE_URL = LOCAL_URL;
-    });
 }
 
 export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
